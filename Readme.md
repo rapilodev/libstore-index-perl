@@ -56,10 +56,14 @@ $ENV{STORE_BACKEND} = 'PP';
 
 | Backend | Implementation | Use Case |
 | --- | --- | --- |
-| **XS** | C / `uthash` | High-performance, production environments. |
+| **XS** | C / `khashl.h` | High-performance, production environments. |
 | **PP** | Pure Perl | Portability, restricted environments, testing. |
 
-## Memory Management
+## Performance & Memory Comparison (1,000,000 Items)
 
-The XS backend utilizes Perl's reference counting (`SvREFCNT`) to ensure that scalars stored in the underlying C hash are garbage collected correctly when removed or when the store is destroyed.
-
+| Metric | XS Implementation (C) | PP Implementation (Perl) | Improvement |
+| :--- | :--- | :--- | :--- |
+| **Insert Time** | 0.5450s | 0.8644s | ~37% faster |
+| **Retrieve Time** | 0.4082s | 0.5327s | ~23% faster |
+| **RSS After Insert** | 125,356 KB | 273,484 KB | ~54% less RAM |
+| **RSS After Release** | 75,944 KB | 264,644 KB | ~71% less RAM |

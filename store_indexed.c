@@ -1,51 +1,61 @@
+#define KHASHL_MAP_IMPLEMENTATION
 #include "store_indexed.h"
 
 void store_indexed_init(store_indexed *store) {
-    store->map = NULL;
+    store->map = kh_store_init();
 }
 
 void store_indexed_set(pTHX_ store_indexed *store, int id, const char *name, SV *value) {
-    StoreEntry *entry;
-    StoreKey lookup_key;
-    memset(&lookup_key, 0, sizeof(StoreKey));
-    lookup_key.id = id;
-    strncpy(lookup_key.name, name, sizeof(lookup_key.name) - 1);
+    StoreKey lookup_k;
+    lookup_k.id = id;
+    lookup_k.name = (char*)name;
 
-    HASH_FIND(hh, store->map, &lookup_key, sizeof(StoreKey), entry);
+    int absent;
+    khint_t i = kh_store_put(store->map, lookup_k, &absent);
 
-    if (entry) {
-        SV *old_value = entry->value;
-        entry->value = SvREFCNT_inc(value);
-        SvREFCNT_dec(old_value);
+    if (!absent) {
+        if (kh_val(store->map, i)) {
+            free(kh_val(store->map, i));
+        }
     } else {
-        entry = malloc(sizeof(StoreEntry));
-        entry->key = lookup_key;
-        entry->value = SvREFCNT_inc(value);
-        HASH_ADD(hh, store->map, key, sizeof(StoreKey), entry);
+        kh_key(store->map, i).name = strdup(name);
+    }
+    if (value && SvOK(value)) {
+        kh_val(store->map, i) = strdup(SvPV_nolen(value));
+    } else {
+        kh_val(store->map, i) = NULL;
     }
 }
 
 SV* store_indexed_get(pTHX_ store_indexed *store, int id, const char *name) {
-    StoreEntry *entry;
+    StoreKey lookup_k;
+    lookup_k.id = id;
+    lookup_k.name = (char*)name;
 
-    StoreKey lookup_key;
-    memset(&lookup_key, 0, sizeof(StoreKey));
-    lookup_key.id = id;
-    strncpy(lookup_key.name, name, sizeof(lookup_key.name) - 1);
+    khint_t i = kh_store_get(store->map, lookup_k);
 
-    HASH_FIND(hh, store->map, &lookup_key, sizeof(StoreKey), entry);
-
-    if (entry) {
-        return newSVsv(entry->value);
+    if (i != kh_end(store->map)) {
+        char *stored_val = kh_val(store->map, i);
+        if (stored_val) {
+            return newSVpv(stored_val, 0); // Return a new, independent SV
+        }
     }
-
-    return &PL_sv_undef;
+    return newSV(0);
 }
+
 void store_indexed_free(pTHX_ store_indexed *store) {
-    StoreEntry *current, *tmp;
-    HASH_ITER(hh, store->map, current, tmp) {
-        HASH_DEL(store->map, current);
-        SvREFCNT_dec(current->value);
-        free(current);
+    if (!store || !store->map) return;
+
+    for (khint_t i = 0; i < kh_end(store->map); ++i) {
+        if (kh_exist(store->map, i)) {
+            free(kh_key(store->map, i).name);
+
+            // Only free the value if it isn't NULL (undef)
+            if (kh_val(store->map, i)) {
+                free(kh_val(store->map, i));
+            }
+        }
     }
+
+    kh_store_destroy(store->map);
 }

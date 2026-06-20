@@ -1,9 +1,8 @@
-```
 # Store::Indexed(3)
 
 ## NAME
 
-**Store::Indexed** - A high-performance, key-indexed data store with dual XS and Pure-Perl backends.
+**Store::Indexed** - A fast, key-indexed data store with dual XS and Pure-Perl backends.
 
 ## SYNOPSIS
 
@@ -58,7 +57,7 @@ The `XS` backend provides a memory-efficient implementation utilizing `uthash` f
 ## REQUIREMENTS
 
 * A C compiler (e.g., `gcc`, `clang`)
-* `uthash` library (included in source)
+* `khashl.h` library (included in source)
 * Perl 5.10+
 
 ---
@@ -79,17 +78,8 @@ While functionally equivalent to the `XS` backend, the `PP` version maintains da
 
 * `STORE_BACKEND`: Set to `XS` or `PP` to globally define the preferred backend for the current process.
 
-## AUTHOR
-
-[Your Name/Organization]
 
 ## SEE ALSO
 
 `XSLoader`, `perlxs`, `perlobject`
 
----
-
-To help you visualize how these components interact at runtime, here is the architecture of the dispatch system:
-
-Would you like me to add a section on how to run the test suite to ensure both backends are functioning correctly on your machine?
-```

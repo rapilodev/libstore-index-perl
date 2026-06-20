@@ -16,18 +16,15 @@
 .\}
 .TH "" "" "" "" ""
 .hy
+.SH Store::Indexed(3)
+.SS NAME
+.PP
+\f[B]Store::Indexed\f[R] - A fast, key-indexed data store with dual XS
+and Pure-Perl backends.
+.SS SYNOPSIS
 .IP
 .nf
 \f[C]
-# Store::Indexed(3)
-
-## NAME
-
-**Store::Indexed** - A high-performance, key-indexed data store with dual XS and Pure-Perl backends.
-
-## SYNOPSIS
-
-\[ga]\[ga]\[ga]perl
 use Store::Indexed;
 
 # Auto-detects best backend (XS preferred)
@@ -83,7 +80,7 @@ critical.
 .IP \[bu] 2
 A C compiler (e.g., \f[V]gcc\f[R], \f[V]clang\f[R])
 .IP \[bu] 2
-\f[V]uthash\f[R] library (included in source)
+\f[V]khashl.h\f[R] library (included in source)
 .IP \[bu] 2
 Perl 5.10+
 .PP
@@ -106,18 +103,6 @@ implementation.
 .IP \[bu] 2
 \f[V]STORE_BACKEND\f[R]: Set to \f[V]XS\f[R] or \f[V]PP\f[R] to globally
 define the preferred backend for the current process.
-.SS AUTHOR
-.PP
-[Your Name/Organization]
 .SS SEE ALSO
 .PP
 \f[V]XSLoader\f[R], \f[V]perlxs\f[R], \f[V]perlobject\f[R]
-.PP
-   *   *   *   *   *
-.PP
-To help you visualize how these components interact at runtime, here is
-the architecture of the dispatch system:
-.PP
-Would you like me to add a section on how to run the test suite to
-ensure both backends are functioning correctly on your machine?
-\[ga]\[ga]\[ga]
