@@ -1,0 +1,10 @@
+TYPEMAP
+store_indexed * T_PTROBJ
+
+INPUT
+T_PTROBJ
+    $var = INT2PTR($type, SvIV((SV*)SvRV($arg)))
+
+OUTPUT
+T_PTROBJ
+    sv_setref_pv($arg, "Store::Indexed::XS", (void*)$var);
