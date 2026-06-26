@@ -1,3 +1,7 @@
+Here are the updated documentation sections for **Store::Indexed**, reflecting the functional design of the XS and PP backends provided.
+
+---
+
 # Store::Indexed(3)
 
 ## NAME
@@ -10,20 +14,21 @@
 use Store::Indexed;
 
 # Auto-detects best backend (XS preferred)
-my $store = Store::Indexed->new();
+my $store = Store::Indexed->new(qw(key1 key2 key3));
 
 # Or force a specific backend
 use Store::Indexed ':xs';
-my $store = Store::Indexed->new(backend => 'XS');
+my $store = Store::Indexed->new(qw(key1 key2));
 
-$store->set(1, "my_key", "data");
-my $val = $store->get(1, "my_key");
+# Accessors are generated dynamically based on keys
+$store->set_key1(0, "value_for_id_0");
+my $val = $store->get_key1(0);
 
 ```
 
 ## DESCRIPTION
 
-**Store::Indexed** provides an interface for storing and retrieving data points indexed by an integer ID and a string name. It supports both a highly optimized C-based implementation (`XS`) and a portable `Pure-Perl` implementation (`PP`).
+**Store::Indexed** provides an interface for storing and retrieving data points indexed by an integer ID and a column name. It uses a flat array structure under the hood to achieve high performance. It supports both a highly optimized C-based implementation (`XS`) and a portable `Pure-Perl` implementation (`PP`).
 
 ## IMPORT TAGS
 
@@ -32,19 +37,18 @@ my $val = $store->get(1, "my_key");
 
 ## METHODS
 
-### new(%args)
+### new(@keys)
 
-Creates a new `Store::Indexed` instance.
+Creates a new `Store::Indexed` instance. The list of `@keys` defines the fixed columns of the data store. This will dynamically generate `get_$key`, `set_$key`, `exists_$key`, and `delete_$key` methods for each key provided.
 
-* `backend`: Can be set to `'XS'` or `'PP'` to override environment or import settings.
+### Dynamic Accessors
 
-### set($id, $name, $value)
+For every key defined in `new()`, the following methods are injected into the class:
 
-Associates a scalar `$value` with a composite key of `$id` and `$name`.
-
-### get($id, $name)
-
-Returns the scalar value associated with the specified `$id` and `$name`, or `undef` if not found.
+* `get_$key($id)`: Returns the value at row `$id` and column `$key`.
+* `set_$key($id, $value)`: Sets the value at row `$id` and column `$key`.
+* `exists_$key($id)`: Returns true if a value exists at that location.
+* `delete_$key($id)`: Removes the value at that location.
 
 ---
 
@@ -52,12 +56,11 @@ Returns the scalar value associated with the specified `$id` and `$name`, or `un
 
 ## DESCRIPTION
 
-The `XS` backend provides a memory-efficient implementation utilizing `uthash` for O(1) average-time complexity lookups. This module is intended for production environments where performance is critical.
+The `XS` backend provides a memory-efficient implementation. It uses a blessed scalar reference to point to a C-allocated buffer or a managed array structure, minimizing the memory overhead associated with Perl hashes. It is intended for production environments where performance and memory footprint are critical.
 
 ## REQUIREMENTS
 
 * A C compiler (e.g., `gcc`, `clang`)
-* `khashl.h` library (included in source)
 * Perl 5.10+
 
 ---
@@ -68,9 +71,9 @@ The `XS` backend provides a memory-efficient implementation utilizing `uthash` f
 
 The `PP` (Pure-Perl) backend provides a fallback implementation for environments where compiling C extensions is not possible (e.g., restricted hosting, cross-compilation targets).
 
-## NOTES
+## IMPLEMENTATION
 
-While functionally equivalent to the `XS` backend, the `PP` version maintains data in a standard Perl hash, which may consume more memory for large datasets compared to the `XS` implementation.
+The `PP` version maintains data in a single, flat Perl array. It calculates indices using the formula `index = row * total_columns + column_offset`. This avoids the overhead of complex data structures while remaining entirely portable.
 
 ---
 
@@ -78,8 +81,11 @@ While functionally equivalent to the `XS` backend, the `PP` version maintains da
 
 * `STORE_BACKEND`: Set to `XS` or `PP` to globally define the preferred backend for the current process.
 
+---
 
 ## SEE ALSO
 
 `XSLoader`, `perlxs`, `perlobject`
+
+---
 
