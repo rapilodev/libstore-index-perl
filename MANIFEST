@@ -1,0 +1,24 @@
+build-docs.sh
+docs/libstore-indexed-perl.md
+install
+lib/Store/Indexed.pm
+lib/Store/Indexed/PP.pm
+lib/Store/Indexed/XS.pm
+Makefile.PL
+MANIFEST			This list of files
+ppport.h
+README
+Readme.md
+Store-Indexed-XS-0.1.tar
+Store-Indexed-XS-0.1.tar.gz
+Store-Indexed-XS-0.1/META.json
+Store-Indexed-XS-0.1/META.yml
+t/pp-perf_mem.t
+t/pp-store.t
+t/xs-perf_mem.t
+t/xs-store.t
+typemap
+XS.bs
+XS.c
+XS.o
+XS.xs

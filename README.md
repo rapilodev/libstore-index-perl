@@ -1,0 +1,48 @@
+# NAME
+
+Store::Indexed - A fast, key-indexed data store with dual XS and Pure-Perl backends.
+
+# SYNOPSIS
+
+    use Store::Indexed;
+
+    # Auto-detects best backend (XS preferred)
+    my $store = Store::Indexed->new(qw(key1 key2 key3));
+
+    # Accessors are generated dynamically based on keys
+    $store->set_key1(0, "value_for_id_0");
+    my $val = $store->get_key1(0);
+
+# DESCRIPTION
+
+**Store::Indexed** provides an interface for storing and retrieving data points 
+indexed by an integer ID and a column name. It uses a flat array structure under 
+the hood to achieve high performance. It supports both a highly optimized 
+C-based implementation (XS) and a portable Pure-Perl implementation (PP).
+
+# METHODS
+
+## new(@keys)
+
+Creates a new `Store::Indexed` instance. The list of `@keys` defines the fixed 
+columns of the data store. This will dynamically generate `get_$key`, 
+`set_$key`, `exists_$key`, and `delete_$key` methods for each key provided.
+
+## Dynamic Accessors
+
+For every key defined in `new()`, the following methods are injected:
+
+- `get_$key($id)`: Returns the value at row `$id` and column `$key`.
+- `set_$key($id, $value)`: Sets the value at row `$id` and column `$key`.
+- `exists_$key($id)`: Returns true if a value exists at that location.
+- `delete_$key($id)`: Removes the value at that location.
+
+# ENVIRONMENT
+
+- `STORE_BACKEND`: Set to `XS` or `PP` to globally define the preferred 
+backend for the current process.
+
+# LICENSE
+
+This library is free software; you can redistribute it and/or modify it 
+under the same terms as Perl itself.
