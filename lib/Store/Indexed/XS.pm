@@ -4,29 +4,26 @@ use warnings;
 use XSLoader;
 
 our $VERSION = '0.1';
-XSLoader::load('Store::Indexed::XS', $VERSION);
+XSLoader::load(__PACKAGE__, $VERSION);
 
-=head1 NAME
+sub new {
+    my ($class, @keys) = @_;
+    my %offset;
+    my $i = 0;
+    $offset{$_} = $i++ for @keys;
 
-Store::Indexed::XS - Storage for custom payload
+    # _new returns the blessed scalar reference
+    my $self = Store::Indexed::XS::_new($class, scalar @keys);
 
-=head1 SYNOPSIS
-
-    use Store::Indexed::XS;
-    
-    my $store = Store::Indexed::XS->new();
-    $store->set(1, "color", "red");
-    my $val = $store->get(1, "color");
-
-=cut
-
-sub get_all_fields {
-    my ($self, $id, @fields) = @_;
-    my %result;
-    for my $field (@fields) {
-        $result{$field} = $self->get($id, $field);
+    # Method injection
+    no strict 'refs';
+    for my $key (@keys) {
+        my $col = $offset{$key};
+        *{"${class}::get_$key"} = sub {$_[0]->_get($_[1], $col)};
+        *{"${class}::set_$key"} = sub {$_[0]->_set($_[1], $col, $_[2])};
+        *{"${class}::exists_$key"} = sub {$_[0]->_exists($_[1], $col)};
+        *{"${class}::delete_$key"} = sub {$_[0]->_delete($_[1], $col)};
     }
-    return \%result;
+    return $self;
 }
-
 1;

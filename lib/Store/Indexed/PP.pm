@@ -3,35 +3,23 @@ use strict;
 use warnings;
 
 sub new {
-    my ($class) = @_;
-    return bless [], $class;
-}
+    my ($class, @keys) = @_;
+    
+    my $cols = scalar @keys;
+    my %offset;
+    my $i = 0;
+    $offset{$_} = $i++ for sort @keys;
+    my $self = bless [], $class;
+    for my $key (keys %offset) {
+        my $col = $offset{$key};
+        no strict 'refs';
+        *{"${class}::get_$key"} = sub { $_[0]->[$_[1] * $cols + $col] };
+        *{"${class}::set_$key"} = sub { $_[0]->[$_[1] * $cols + $col] = $_[2] };
+        *{"${class}::exists_$key"} = sub { exists $_[0]->[$_[1] * $cols + $col] };
+        *{"${class}::delete_$key"} = sub { delete $_[0]->[$_[1] * $cols + $col] };
+    }
 
-sub set {
-    die if @_ != 4;
-    my ($self, $id, $key, $val) = @_;
-    $self->[$id]{$key} = $_[3];
-    return 1;
-}
-
-sub get {
-    die if @_ != 3;
-    my ($self, $id, $key) = @_;
-    return $self->[$id]{$key};
-}
-
-sub delete {
-    die if @_ != 3;
-    my ($self, $id, $key) = @_;
-    delete $self->[$id]{$key};
-    return 1;
-}
-
-sub exists {
-    my ($self, $id, $key) = @_;
-    die if @_ != 3;
-    return exists $self->[$id]{$key} ? 1 : 0;
+    return $self;
 }
 
 1;
-
