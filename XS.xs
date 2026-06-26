@@ -75,6 +75,31 @@ _get(SV *obj, int id, int col)
     OUTPUT:
         RETVAL
 
+bool
+_exists(SV *obj, int id, int col)
+    CODE:
+        IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
+        // Check bounds and ensure the offset is not 0 (our "empty" marker)
+        if (id < 0 || id >= self->max_rows) {
+            RETVAL = 0;
+        } else {
+            uint32_t offset = self->offsets[id * self->cols + col];
+            RETVAL = (offset != 0);
+        }
+    OUTPUT:
+        RETVAL
+
+void
+_delete(SV *obj, int id, int col)
+    CODE:
+        IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
+        if (id >= 0 && id < self->max_rows) {
+            // Simply reset the offset to 0. 
+            // The memory in the pool is still there, but it is now 
+            // logically unreachable and thus "deleted".
+            self->offsets[id * self->cols + col] = 0;
+        }
+
 void
 DESTROY(SV *obj)
     CODE:
