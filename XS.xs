@@ -4,13 +4,26 @@
 #include "XSUB.h"
 #include "ppport.h"
 
-// Set a safe maximum or implement a growing array if needed
-#define MAX_ROWS 1100000 
-
 typedef struct {
     int cols;
+    int max_rows;    // Current capacity
     SV **data;
 } IndexedStore;
+
+/* Helper to grow the storage */
+void grow_store(IndexedStore *self, int new_min_rows) {
+    int old_max = self->max_rows;
+    // Calculate new capacity: round up to nearest 1000
+    self->max_rows = ((new_min_rows / 1000) + 1) * 1000;
+    
+    // Reallocate the data array
+    self->data = (SV **)realloc(self->data, self->max_rows * self->cols * sizeof(SV *));
+    
+    // Initialize the new memory slots to NULL
+    for (int i = (old_max * self->cols); i < (self->max_rows * self->cols); i++) {
+        self->data[i] = NULL;
+    }
+}
 
 MODULE = Store::Indexed::XS  PACKAGE = Store::Indexed::XS
 
@@ -21,8 +34,8 @@ _new(char *class, int cols)
     CODE:
         IndexedStore *self = (IndexedStore *)malloc(sizeof(IndexedStore));
         self->cols = cols;
-        // Allocate memory for 1.1 million rows
-        self->data = (SV **)calloc(MAX_ROWS * cols, sizeof(SV *));
+        self->max_rows = 1000; // Start with 1000
+        self->data = (SV **)calloc(self->max_rows * self->cols, sizeof(SV *));
         
         SV *sv = newSV(0);
         sv_setref_pv(sv, class, (void*)self);
@@ -34,7 +47,12 @@ void
 _set(SV *obj, int id, int col, SV *val)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
-        if (id < 0 || id >= MAX_ROWS) croak("ID %d out of bounds", id);
+        if (id < 0) croak("ID must be positive");
+        
+        // Grow if ID exceeds current capacity
+        if (id >= self->max_rows) {
+            grow_store(self, id);
+        }
         
         int idx = id * self->cols + col;
         if (self->data[idx]) SvREFCNT_dec(self->data[idx]);
@@ -44,14 +62,15 @@ SV *
 _get(SV *obj, int id, int col)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
-        if (id < 0 || id >= MAX_ROWS) croak("ID %d out of bounds", id);
-        
-        int idx = id * self->cols + col;
-        if (self->data[idx]) {
-            RETVAL = SvREFCNT_inc(self->data[idx]);
-        } else {
-            // Return undef if index is empty
+        if (id < 0 || id >= self->max_rows) {
             RETVAL = &PL_sv_undef;
+        } else {
+            int idx = id * self->cols + col;
+            if (self->data[idx]) {
+                RETVAL = SvREFCNT_inc(self->data[idx]);
+            } else {
+                RETVAL = &PL_sv_undef;
+            }
         }
     OUTPUT:
         RETVAL
@@ -60,7 +79,7 @@ bool
 _exists(SV *obj, int id, int col)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
-        if (id < 0 || id >= MAX_ROWS) {
+        if (id < 0 || id >= self->max_rows) {
             RETVAL = 0;
         } else {
             int idx = id * self->cols + col;
@@ -68,13 +87,25 @@ _exists(SV *obj, int id, int col)
         }
     OUTPUT:
         RETVAL
-        
+
+void
+_delete(SV *obj, int id, int col)
+    CODE:
+        IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
+        if (id >= 0 && id < self->max_rows) {
+            int idx = id * self->cols + col;
+            if (self->data[idx]) {
+                SvREFCNT_dec(self->data[idx]);
+                self->data[idx] = NULL;
+            }
+        }
+
 void
 DESTROY(SV *obj)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
         if (self) {
-            for(int i = 0; i < MAX_ROWS * self->cols; i++) {
+            for(int i = 0; i < self->max_rows * self->cols; i++) {
                 if (self->data[i]) SvREFCNT_dec(self->data[i]);
             }
             free(self->data);

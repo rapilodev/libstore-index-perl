@@ -6,6 +6,6 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME          => 'Store::Indexed::XS',
     VERSION_FROM  => 'lib/Store/Indexed/XS.pm',
-    OBJECT        => 'XS$(OBJ_EXT) store_indexed$(OBJ_EXT)',
+    OBJECT        => 'XS$(OBJ_EXT)',
     INC           => '-I.', 
 );
