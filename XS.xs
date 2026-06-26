@@ -3,21 +3,16 @@
 #include "perl.h"
 #include "XSUB.h"
 #include "ppport.h"
+#include <stdint.h>
 
 typedef struct {
     int cols;
     int max_rows;
-    char **data; // Now storing raw C strings
+    uint32_t *offsets; // 4-byte offsets instead of 8-byte pointers
+    char *pool;        // The packed string slab
+    size_t pool_size;
+    size_t pool_used;
 } IndexedStore;
-
-void grow_store(IndexedStore *self, int new_min_rows) {
-    int old_max = self->max_rows;
-    self->max_rows = ((new_min_rows / 1000) + 1) * 1000;
-    self->data = (char **)realloc(self->data, self->max_rows * self->cols * sizeof(char *));
-    for (int i = (old_max * self->cols); i < (self->max_rows * self->cols); i++) {
-        self->data[i] = NULL;
-    }
-}
 
 MODULE = Store::Indexed::XS  PACKAGE = Store::Indexed::XS
 
@@ -29,7 +24,13 @@ _new(char *class, int cols)
         IndexedStore *self = (IndexedStore *)malloc(sizeof(IndexedStore));
         self->cols = cols;
         self->max_rows = 1000;
-        self->data = (char **)calloc(self->max_rows * self->cols, sizeof(char *));
+        // 4 bytes per entry
+        self->offsets = (uint32_t *)calloc(self->max_rows * self->cols, sizeof(uint32_t));
+        self->pool_size = 1024 * 1024; // Start with 1MB arena
+        self->pool = (char *)malloc(self->pool_size);
+        self->pool_used = 1; // Start at 1, so 0 can mean "undef"
+        self->pool[0] = '\0';
+        
         SV *sv = newSV(0);
         sv_setref_pv(sv, class, (void*)self);
         RETVAL = sv;
@@ -40,48 +41,47 @@ void
 _set(SV *obj, int id, int col, SV *val)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
-        if (id >= self->max_rows) grow_store(self, id);
+        if (id >= self->max_rows) {
+            int old_max = self->max_rows;
+            self->max_rows = id + 1000;
+            self->offsets = (uint32_t *)realloc(self->offsets, self->max_rows * self->cols * sizeof(uint32_t));
+            memset(self->offsets + (old_max * self->cols), 0, (self->max_rows - old_max) * self->cols * sizeof(uint32_t));
+        }
+
+        STRLEN len;
+        char *str = SvPV(val, len);
         
+        // Ensure pool has space (len + 1 for null terminator)
+        if (self->pool_used + len + 1 > self->pool_size) {
+            self->pool_size += (len + 1024);
+            self->pool = (char *)realloc(self->pool, self->pool_size);
+        }
+
         int idx = id * self->cols + col;
-        if (self->data[idx]) free(self->data[idx]);
-        
-        // Use SvPV_nolen to safely extract string, even from numbers
-        self->data[idx] = strdup(SvPV_nolen(val));
-        
+        self->offsets[idx] = (uint32_t)self->pool_used;
+        memcpy(self->pool + self->pool_used, str, len + 1);
+        self->pool_used += (len + 1);
+
 SV *
 _get(SV *obj, int id, int col)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
-        if (id < 0 || id >= self->max_rows || !self->data[id * self->cols + col]) {
+        if (id < 0 || id >= self->max_rows || self->offsets[id * self->cols + col] == 0) {
             RETVAL = &PL_sv_undef;
         } else {
-            // Convert C string back to Perl SV for returning
-            RETVAL = newSVpv(self->data[id * self->cols + col], 0);
+            uint32_t offset = self->offsets[id * self->cols + col];
+            RETVAL = newSVpv(self->pool + offset, 0);
         }
     OUTPUT:
         RETVAL
-
-void
-_delete(SV *obj, int id, int col)
-    CODE:
-        IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
-        if (id >= 0 && id < self->max_rows) {
-            int idx = id * self->cols + col;
-            if (self->data[idx]) {
-                free(self->data[idx]);
-                self->data[idx] = NULL;
-            }
-        }
 
 void
 DESTROY(SV *obj)
     CODE:
         IndexedStore *self = INT2PTR(IndexedStore *, SvIV(SvRV(obj)));
         if (self) {
-            for(int i = 0; i < self->max_rows * self->cols; i++) {
-                if (self->data[i]) free(self->data[i]);
-            }
-            free(self->data);
+            free(self->offsets);
+            free(self->pool);
             free(self);
             sv_setiv(SvRV(obj), 0);
         }
